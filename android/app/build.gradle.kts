@@ -18,7 +18,9 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.baibaoxiang.app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // 不设 ndkVersion：这个 app 没有一行 C/C++ 代码，所有依赖都是纯
+    // Kotlin/Java。模板默认要求 NDK，会白白多下 700 MB 并触发
+    // sdkmanager 的自动安装（该命令在当前的 cmdline-tools 里已废弃且会崩）。
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

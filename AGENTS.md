@@ -211,9 +211,71 @@ PUB_HOSTED_URL=https://pub.flutter-io.cn
 FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
 ```
 
-> **网络很慢**，实测带宽 40 KB/s ~ 1.5 MB/s，且会中途断流。
-> 大文件下载必须带 `-C -` 断点续传和 `--retry`，下完要校验 zip 完整性，
-> 不要假设一次能下完。
+已安装的 SDK 组件：
+
+```
+platform-tools        37.0.1
+platforms             android-36
+build-tools           36.0.0
+ndk                   28.2.13676358   ← Flutter 工具链要求，必须存在
+cmdline-tools         latest (16111833)
+```
+
+### 网络：这台机器最大的坑
+
+实测带宽 40 KB/s ~ 1.5 MB/s，**且会中途断流**。官方源尤其慢：
+`repo.maven.apache.org` 5 KB/s、`plugins.gradle.org` 3 KB/s、
+`services.gradle.org` 会挂死。
+
+**大文件下载必须**带 `-C -` 断点续传和 `--retry`，下完校验 zip 完整性
+（用 `[System.IO.Compression.ZipFile]::OpenRead`），不要假设一次能下完。
+
+### Gradle 仓库配置（改之前务必读）
+
+`android/settings.gradle.kts` 的 `pluginManagement.repositories` 和
+`android/build.gradle.kts` 的 `allprojects.repositories` 已改成**只用国内源**：
+
+```kotlin
+maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }  // 插件门户镜像
+maven { url = uri("https://maven.aliyun.com/repository/google") }         // Google Maven 镜像
+maven { url = uri("https://maven.aliyun.com/repository/public") }         // Maven Central 镜像
+maven { url = uri("https://storage.flutter-io.cn/download.flutter.io") }  // Flutter 引擎原生库
+maven { url = uri("https://storage.googleapis.com/download.flutter.io") } // 同上，备用
+```
+
+**两条铁律**：
+
+1. **不要加回 `google()` / `mavenCentral()` / `gradlePluginPortal()`**。
+   它们极慢，一被回退过去就长时间卡住。
+2. **不能加会报错（超时 / 502）的仓库，尤其不能放在能用的仓库前面**。
+   Gradle 遇到仓库「报错」会**中止整个解析**，而不是继续试下一个
+   （404 算「没有」，可以继续；超时算「错误」，直接失败）。
+   华为云 `repo.huaweicloud.com` 就是这种：对绝大多数包可用，
+   但对 `io.flutter:*` 会超时，从而把整个构建搞挂。**已经因此移除了。**
+
+### 其他两个坑
+
+- **`sdkmanager.bat` 是坏的**：这个 cmdline-tools 版本里它已废弃，
+  运行时崩溃（退出码 `0xC0000409`）。装 SDK 组件要用
+  `C:\Android\sdk\cmdline-tools\latest\bin\android.exe sdk install <包名>`。
+- **不要中途强杀构建进程**：会损坏 Kotlin 增量编译缓存，之后报
+  `Could not close incremental caches`。项目已设 `kotlin.incremental=false`
+  规避；真踩到时删掉 `build/` 和 `android/.gradle` 重建。
+
+### Gradle 发行包
+
+`services.gradle.org` 会挂死，所以 `gradle-9.3.1-all.zip` 是手动下载后
+放进 wrapper 缓存的：
+
+```
+C:\Users\asus\.gradle\wrapper\dists\gradle-9.3.1-all\9ot9r568e8zfvvd4mn8rbu1j0\
+    gradle-9.3.1-all.zip      （224 MB，已校验）
+    gradle-9.3.1/             （已解压）
+    gradle-9.3.1-all.zip.ok   （完成标记）
+```
+
+注意缓存目录名 `9ot9r568e8zfvvd4mn8rbu1j0` 是从 `distributionUrl` 算出来的哈希，
+**改 `distributionUrl` 会导致 Gradle 认不出缓存的包而重新下载**。
 
 ---
 

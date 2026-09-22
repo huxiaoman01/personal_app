@@ -46,3 +46,7 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# 打包产物（可随时重新生成，别塞进版本库）
+/dist/
+

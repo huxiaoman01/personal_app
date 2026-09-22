@@ -11,9 +11,12 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
+        // 只用国内镜像。官方源在国内实测 repo.maven.apache.org 只有 5 KB/s、
+        // plugins.gradle.org 只有 3 KB/s，一旦回退过去就会长时间卡住。
+        // 这三个阿里云仓库是 Google Maven / Maven Central / Gradle 插件门户的完整镜像。
+        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
     }
 }
 
