@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_identity.dart';
 import 'app_globals.dart';
 import 'data/app_database.dart';
 import 'data/card_repository.dart';
@@ -27,7 +28,7 @@ class BaibaoxiangApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '万能百宝箱',
+      title: AppIdentity.displayName,
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),

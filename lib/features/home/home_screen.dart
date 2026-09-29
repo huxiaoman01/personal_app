@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app_globals.dart';
 import '../../models/study_card.dart';
 import '../../theme/app_theme.dart';
-import '../export/export_sheet.dart';
+import '../export/export_select_screen.dart';
 import '../export/import_sheet.dart';
 import '../formula/formula_list_screen.dart';
 import '../idea/idea_list_screen.dart';
@@ -173,6 +173,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (imported) await _reload();
   }
 
+  /// 导出先跳到「导出数据」页挑范围，挑完才打包。
+  Future<void> _openExport() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext _) => const ExportSelectScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(child: _SearchEntry(onTap: _openSearch)),
                   const SizedBox(width: AppSpace.xl),
                   _MoreButton(
-                    onExport: () => showExportSheet(context),
+                    onExport: _openExport,
                     onImport: _openImport,
                     onTrash: _openTrash,
                   ),
@@ -301,7 +310,7 @@ class _MoreButton extends StatelessWidget {
           PopupMenuItem<String>(
             value: 'export',
             child: Text(
-              '导出全部数据',
+              '导出数据',
               style: AppText.body.copyWith(color: p.text),
             ),
           ),

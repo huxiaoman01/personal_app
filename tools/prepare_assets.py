@@ -5,6 +5,7 @@
   1. 黑底的角色图 → 透明 PNG（首页六个入口右边那六张贴纸）
   2. 拍立得截图 → app 图标（含自适应图标的前景层）
   3. 米黄底的手绘线稿 → 「纯白 + alpha」的装饰图（列表页背景，见 lib/widgets/app_background.dart）
+  4. 白底的贴纸图 → 透明 PNG（复习结束页那张举着对勾的小图）
 
 这是**一次性**脚本：源图不进货，跑完把 assets/ 下的产物提交即可。
 源图在本机上的绝对路径属于私人信息，不进版本库，所以一律从命令行参数或
@@ -31,6 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 HUB_DIR = ROOT / "assets" / "hub"
 ICON_DIR = ROOT / "assets" / "icon"
 DECOR_DIR = ROOT / "assets" / "decor"
+CELEBRATE_DIR = ROOT / "assets" / "celebrate"
 
 # 源图目录：环境变量给个默认值，命令行 --source-dir 优先级更高。
 DEFAULT_SOURCE_DIR = os.environ.get("BAIBAOXIANG_SOURCE_DIR", r"C:\path\to\sources")
@@ -48,6 +50,7 @@ HUB_SOURCE_NAMES = [
 # 拍立得那张图标源图，和装饰线稿，同样放在源图目录里。
 ICON_SOURCE_NAME = "app_icon_source.jpg"
 DECOR_SOURCE_NAME = "decor_source.png"
+CELEBRATE_SOURCE_NAME = "finish_mark_source.jpg"
 
 # 拍立得白框里面的画（实测值）。
 ICON_INNER_BOX = (224, 200, 808, 730)  # left, top, right, bottom -> 584 x 530
@@ -57,6 +60,11 @@ MARKER = (255, 0, 255)
 
 HUB_SIZE = 256
 ICON_SIZE = 1024
+CELEBRATE_SIZE = 512
+
+# 白底抠图时的容差：和四个角上的颜色差多少以内算「背景」。
+# 白底图比黑底图好抠——线条有深色描边，边界很清楚。
+CELEBRATE_WHITE_THRESHOLD = 30
 
 # 装饰线稿：三块图案在原图里的位置（左, 上, 右, 下），实测值。
 # 原图 1600x2848 三块纵向排开，右下角还有一行「豆包AI生成」水印——
@@ -125,6 +133,34 @@ def _find_opaque_seed(alpha: Image.Image) -> tuple[int, int] | None:
                 if 0 <= x < width and 0 <= y < height and alpha.getpixel((x, y)) > 200:
                     return x, y
     return None
+
+
+def strip_white_background(img: Image.Image, threshold: int) -> Image.Image:
+    """从四个角灌水，把与边缘连通的近白区域变透明。
+
+    和 [strip_black_background] 一个思路，只是这批贴纸是白底的。
+    人物身上的白（外套、白手套、脑袋后面那圈白边）都被深色描边圈着，
+    和边缘连不通，所以会原样留着。
+    """
+    rgb = img.convert("RGB")
+    width, height = rgb.size
+    work = rgb.copy()
+
+    limit = 255 - threshold
+    seeds = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+    for seed in seeds:
+        r, g, b = work.getpixel(seed)
+        if r > limit and g > limit and b > limit:
+            ImageDraw.floodfill(work, seed, MARKER, thresh=threshold)
+
+    marker_layer = Image.new("RGB", (width, height), MARKER)
+    is_background = ImageChops.difference(work, marker_layer).convert("L").point(
+        lambda v: 255 if v == 0 else 0
+    )
+
+    rgba = rgb.convert("RGBA")
+    rgba.putalpha(is_background.point(lambda v: 0 if v == 255 else 255))
+    return rgba
 
 
 def keep_main_subject(rgba: Image.Image) -> Image.Image:
@@ -224,6 +260,16 @@ def build_decor(source: Image.Image) -> list[Image.Image]:
     return layers
 
 
+def build_celebrate(source: Image.Image) -> Image.Image:
+    """白底贴纸 → 透明 PNG。
+
+    [keep_main_subject] 会把只留最大一块连通区域，右下角那个小红书水印
+    是浮在白底上的孤儿块，切完自然就没了——不用专门去裁它。
+    """
+    cut = strip_white_background(source, CELEBRATE_WHITE_THRESHOLD)
+    return normalize_square(keep_main_subject(cut), CELEBRATE_SIZE)
+
+
 def _background_luminance(gray: Image.Image) -> int:
     """一块图里绝大多数像素都是纸，取 95 分位当背景亮度。
 
@@ -253,6 +299,11 @@ def main() -> int:
         help=f"单独指定装饰线稿的路径，默认是 <source-dir>/{DECOR_SOURCE_NAME}",
     )
     parser.add_argument(
+        "--celebrate-source",
+        default=None,
+        help=f"单独指定结束页贴纸的路径，默认是 <source-dir>/{CELEBRATE_SOURCE_NAME}",
+    )
+    parser.add_argument(
         "--threshold",
         type=int,
         default=45,
@@ -268,8 +319,17 @@ def main() -> int:
         if args.decor_source
         else source_dir / DECOR_SOURCE_NAME
     )
+    celebrate_source = (
+        Path(args.celebrate_source)
+        if args.celebrate_source
+        else source_dir / CELEBRATE_SOURCE_NAME
+    )
 
-    missing = [p for p in hub_sources + [icon_source, decor_source] if not p.exists()]
+    missing = [
+        p
+        for p in hub_sources + [icon_source, decor_source, celebrate_source]
+        if not p.exists()
+    ]
     if missing:
         for path in missing:
             print(f"找不到源文件: {path}", file=sys.stderr)
@@ -283,6 +343,7 @@ def main() -> int:
     HUB_DIR.mkdir(parents=True, exist_ok=True)
     ICON_DIR.mkdir(parents=True, exist_ok=True)
     DECOR_DIR.mkdir(parents=True, exist_ok=True)
+    CELEBRATE_DIR.mkdir(parents=True, exist_ok=True)
 
     for index, source_path in enumerate(hub_sources, start=1):
         with Image.open(source_path) as raw:
@@ -314,6 +375,16 @@ def main() -> int:
             f"decor_{index}.png  {image.size[0]}x{image.size[1]}"
             f"  有效线稿 {opaque / (DECOR_SIZE ** 2):.1%}"
         )
+
+    with Image.open(celebrate_source) as raw:
+        celebrate = build_celebrate(raw)
+    celebrate.save(CELEBRATE_DIR / "finish_mark.png")
+    histogram = celebrate.getchannel("A").histogram()
+    opaque = sum(histogram[129:])
+    print(
+        f"finish_mark.png  {celebrate.size[0]}x{celebrate.size[1]}"
+        f"  不透明像素 {opaque / (CELEBRATE_SIZE ** 2):.0%}"
+    )
     return 0
 
 

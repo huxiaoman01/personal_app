@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:intl/intl.dart';
 
+import '../app_identity.dart';
 import '../models/study_card.dart';
 import '../models/subject.dart';
 import 'card_repository.dart';
@@ -185,7 +186,9 @@ class ImportService {
 
     final ArchiveFile? jsonFile = _fileNamed(archive, jsonFileName);
     if (jsonFile == null) {
-      throw ImportException('包里没有 $jsonFileName，看起来不是万能百宝箱的备份');
+      throw ImportException(
+        '包里没有 $jsonFileName，看起来不是${AppIdentity.displayName}的备份',
+      );
     }
 
     final Map<String, Object?> payload;
@@ -195,8 +198,12 @@ class ImportService {
       throw ImportException('$jsonFileName 读不出来，这个包可能传坏了');
     }
 
-    if (payload['app'] != '万能百宝箱') {
-      throw ImportException('这个压缩包不是万能百宝箱导出的');
+    // 改过名字，老备份里写的是老名字，一并认下来。
+    final String appId = payload['app'] as String? ?? '';
+    if (!AppIdentity.acceptsBackupId(appId)) {
+      throw ImportException(
+        '这个压缩包不是${AppIdentity.displayName}导出的',
+      );
     }
     final int version = (payload['schemaVersion'] as int?) ?? 1;
     if (version > supportedSchemaVersion) {

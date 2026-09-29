@@ -8,15 +8,22 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../app_globals.dart';
+import '../../app_identity.dart';
 import '../../data/export_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/sheet_action.dart';
 
-/// 导出入口：先选交付方式，再打包 zip。
+/// 导出入口：先弹交付方式（分享出去 / 存到手机），再打包 zip。
 ///
 /// 「分享出去」走系统分享面板，「存到手机」走 SAF 保存对话框——
 /// 两条路都不需要存储权限。
-Future<void> showExportSheet(BuildContext context) async {
+///
+/// [selection] 是要导出哪些东西；null 表示全都导（从「导出数据」页进来时
+/// 会把用户勾好的那份传过来）。
+Future<void> showExportSheet(
+  BuildContext context, {
+  ExportSelection? selection,
+}) async {
   final String? action = await showModalBottomSheet<String>(
     context: context,
     builder: (BuildContext sheet) => SafeArea(
@@ -39,10 +46,14 @@ Future<void> showExportSheet(BuildContext context) async {
     ),
   );
   if (action == null || !context.mounted) return;
-  await _run(context, share: action == 'share');
+  await _run(context, share: action == 'share', selection: selection);
 }
 
-Future<void> _run(BuildContext context, {required bool share}) async {
+Future<void> _run(
+  BuildContext context, {
+  required bool share,
+  ExportSelection? selection,
+}) async {
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
   messenger.showSnackBar(
     const SnackBar(
@@ -54,8 +65,10 @@ Future<void> _run(BuildContext context, {required bool share}) async {
   try {
     final ExportService service = ExportService(cardRepository, imageStore);
     final DateTime now = DateTime.now();
-    final Uint8List bytes = await service.buildZip(now: now);
-    final String fileName = service.zipFileName(now);
+    final Uint8List bytes =
+        await service.buildZip(now: now, selection: selection);
+    final String fileName =
+        service.zipFileName(now, partial: selection != null);
 
     messenger.hideCurrentSnackBar();
 
@@ -66,7 +79,7 @@ Future<void> _run(BuildContext context, {required bool share}) async {
       await SharePlus.instance.share(
         ShareParams(
           files: <XFile>[XFile(file.path)],
-          text: '万能百宝箱导出',
+          text: '${AppIdentity.displayName}导出',
         ),
       );
       messenger.showSnackBar(

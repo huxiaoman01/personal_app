@@ -1,5 +1,5 @@
 name: baibaoxiang
-description: "万能百宝箱 —— 个人自用的离线学习小工具"
+description: "可可嫑记 —— 个人自用的离线学习小工具"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.6.0+6
+version: 0.7.0+7
 
 environment:
   sdk: ^3.13.4
@@ -74,6 +74,8 @@ flutter:
     # 列表页背景上那三个淡淡的图案（纯白 + alpha，颜色由主题给）。
     # 源图是米黄底的手绘线稿，由 tools/prepare_assets.py 处理生成。
     - assets/decor/
+    # 复习结束页那张举着对勾的小图（白底贴纸抠成透明 PNG）。
+    - assets/celebrate/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

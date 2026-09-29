@@ -7,7 +7,8 @@
 
 ## 1. 项目是什么
 
-**万能百宝箱**：一个单人自用的安卓学习工具 app，装在自己的手机上。
+**可可嫑记**（2026-09 从「万能百宝箱」改名而来，内部包名和数据库文件名没动，
+所以覆盖安装不丢数据）：一个单人自用的安卓学习工具 app，装在自己的手机上。
 
 - 完全离线，不联网、无账号、无云同步
 - 用户是考研学生，科目：运筹学、高数、线性代数、数据库、408
@@ -55,7 +56,9 @@
 | 中文字体 | 系统默认 | 不引第三方字体（省 APK 体积） |
 | 主题 | Material 3，跟随系统深浅色 | |
 
-`applicationId com.baibaoxiang.app`、`android:label 万能百宝箱`、`minSdk 24`。
+`applicationId com.baibaoxiang.app`、`android:label 可可嫑记`、`minSdk 24`。
+（`applicationId`、数据库文件名 `baibaoxiang.db`、Dart 包名 `baibaoxiang`
+都是改名时**故意留着不动**的：改了会变成另一个 app、或者让老数据读不到。）
 
 依赖：`sqflite`、`path`、`path_provider`、`image_picker`、`share_plus`、
 `file_picker`、`archive`、`intl`。测试用 `sqflite_common_ffi`。
@@ -175,6 +178,8 @@ lib/
 - ❌ 纯黑 `#000`、纯白 `#FFF` 作为大面积底色（全屏看图页除外，用 `#0A1220`）
 - ❌ Material 默认紫色；大面积主色填充
 - ❌ 弹跳、缩放等装饰性动画
+  - 唯一的例外：复习结束页那张图案的「从小到大出现」（用户点名要的）。
+    见 `card_review_screen.dart` 的 `_FinishedView.finishMarkAsset`。
 
 ### 交互
 

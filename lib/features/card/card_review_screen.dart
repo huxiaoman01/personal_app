@@ -354,75 +354,111 @@ class _FinishedView extends StatelessWidget {
   final VoidCallback onAgain;
   final VoidCallback onBack;
 
+  /// 结束图案。
+  ///
+  /// 这是全 app 唯一一处缩放动画，是用户点名要的（「从小到大出现」）——
+  /// AGENTS.md 第 6 节「不做装饰性动画」那一条已经为它留了例外，
+  /// 别当成违规删掉。
+  static const String finishMarkAsset = 'assets/celebrate/finish_mark.png';
+
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final BorderRadius radius = BorderRadius.circular(AppRadius.pill);
 
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpace.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(Icons.check_circle_outline, size: 40, color: p.textTertiary),
-            const SizedBox(height: AppSpace.md),
-            Text(
-              '今天这 $count 张看完了',
-              textAlign: TextAlign.center,
-              style: AppText.body.copyWith(color: p.textSecondary),
-            ),
-            const SizedBox(height: AppSpace.xl),
-            SizedBox(
-              width: 176,
-              child: Material(
-                color: p.primary,
-                borderRadius: radius,
-                child: InkWell(
-                  onTap: onAgain,
+      // 加了图案之后整块比原来高，小屏手机（比如 640 高）会顶出去，
+      // 所以让它能滚——内容放得下时看不出来，放不下时才起作用。
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: AppSpace.lg),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _PopIn(
+                child: Image.asset(finishMarkAsset, width: 160),
+              ),
+              const SizedBox(height: AppSpace.md),
+              Text(
+                '今天这 $count 张看完了',
+                textAlign: TextAlign.center,
+                style: AppText.body.copyWith(color: p.textSecondary),
+              ),
+              const SizedBox(height: AppSpace.xl),
+              SizedBox(
+                width: 176,
+                child: Material(
+                  color: p.primary,
                   borderRadius: radius,
-                  child: SizedBox(
-                    height: AppSize.iconBlock,
-                    child: Center(
-                      child: Text(
-                        '再来 10 张',
-                        style: AppText.body.copyWith(
-                          color: p.onPrimary,
-                          fontWeight: FontWeight.w600,
+                  child: InkWell(
+                    onTap: onAgain,
+                    borderRadius: radius,
+                    child: SizedBox(
+                      height: AppSize.iconBlock,
+                      child: Center(
+                        child: Text(
+                          '再来 10 张',
+                          style: AppText.body.copyWith(
+                            color: p.onPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: AppSpace.md),
-            SizedBox(
-              width: 176,
-              child: Material(
-                color: Colors.transparent,
-                borderRadius: radius,
-                child: InkWell(
-                  onTap: onBack,
+              const SizedBox(height: AppSpace.md),
+              SizedBox(
+                width: 176,
+                child: Material(
+                  color: Colors.transparent,
                   borderRadius: radius,
-                  child: Container(
-                    height: AppSize.iconBlock,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: p.divider),
-                      borderRadius: radius,
-                    ),
-                    child: Text(
-                      '回卡片库',
-                      style: AppText.body.copyWith(color: p.textSecondary),
+                  child: InkWell(
+                    onTap: onBack,
+                    borderRadius: radius,
+                    child: Container(
+                      height: AppSize.iconBlock,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: p.divider),
+                        borderRadius: radius,
+                      ),
+                      child: Text(
+                        '回卡片库',
+                        style: AppText.body.copyWith(color: p.textSecondary),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// 进场时从 0.6 放大到 1.0，260ms 到位，不回弹。
+///
+/// 用 [TweenAnimationBuilder] 而不是 AnimationController：这里只需要
+/// 「出现时播一次」，省掉一个 controller 的创建和销毁。
+class _PopIn extends StatelessWidget {
+  const _PopIn({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.6, end: 1),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      builder: (BuildContext context, double scale, Widget? child) =>
+          Transform.scale(scale: scale, child: child),
+      child: child,
     );
   }
 }

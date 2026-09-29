@@ -245,6 +245,37 @@ void main() {
     expect(find.text('再来 10 张'), findsOneWidget);
   });
 
+  testWidgets('复习结束页：举对勾的小图放大出现，最后停在原尺寸',
+      (WidgetTester tester) async {
+    await tester.runAsync(() => insertCard(title: '唯一的一张'));
+    await pumpPage(tester, const CardLibraryScreen(feature: memoryFeature));
+
+    await tester.tap(find.text('开始复习'));
+    await settle(tester);
+    await tester.tap(find.text('记得'));
+    await settle(tester);
+
+    // 结束页的标志是那张贴纸，不再是原来那个 Material 对勾图标。
+    final Finder mark = find.byWidgetPredicate(
+      (Widget widget) =>
+          widget is Image &&
+          widget.image is AssetImage &&
+          (widget.image as AssetImage).assetName ==
+              'assets/celebrate/finish_mark.png',
+    );
+    expect(mark, findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_outline), findsNothing);
+    expect(find.text('今天这 1 张看完了'), findsOneWidget);
+
+    // 动画是一次性放大到位：停下来的时候应该是原始大小（缩放系数 1），
+    // 不能停在 0.6 那一步。
+    final Transform scale = tester.widget<Transform>(
+      find.ancestor(of: mark, matching: find.byType(Transform)).first,
+    );
+    expect(scale.transform.getMaxScaleOnAxis(), closeTo(1, 0.001));
+    expect(tester.getSize(mark).width, 160);
+  });
+
   testWidgets('队列空的时候进复习页，给一句空提示', (WidgetTester tester) async {
     await pumpPage(tester, const CardReviewScreen(feature: memoryFeature));
 

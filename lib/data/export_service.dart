@@ -4,10 +4,30 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:intl/intl.dart';
 
+import '../app_identity.dart';
 import '../models/study_card.dart';
 import '../models/subject.dart';
 import 'card_repository.dart';
 import 'image_store.dart';
+
+/// 导出时选了哪些东西。
+///
+/// 一张卡片入选的条件是「功能在选中集合里 **且** 科目在选中集合里」；
+/// 灵感和没归类的卡片都算「未分类」那一项（`subjectIds` 里的 `null`）。
+class ExportSelection {
+  const ExportSelection({required this.types, required this.subjectIds});
+
+  /// 选中的卡片类型（[CardType] 里的那几个字符串）。
+  final Set<String> types;
+
+  /// 选中的科目 id；`null` 代表「未分类」。
+  final Set<int?> subjectIds;
+
+  bool includesType(String type) => types.contains(type);
+
+  bool includes(StudyCard card) =>
+      includesType(card.type) && subjectIds.contains(card.subjectId);
+}
 
 /// 导出 Markdown + 图片 zip。给定同样的数据，输出是确定的，方便单测。
 class ExportService {
@@ -25,30 +45,47 @@ class ExportService {
   static const String jsonFileName = 'data.json';
   static const String imagesFolder = 'images';
 
-  String zipFileName(DateTime now) =>
-      '万能百宝箱_${DateFormat('yyyyMMdd').format(now)}.zip';
+  /// 导出包的文件名。筛过东西的包带「部分」两个字，一眼能区分。
+  String zipFileName(DateTime now, {bool partial = false}) =>
+      '${AppIdentity.displayName}${partial ? '_部分' : ''}'
+      '_${DateFormat('yyyyMMdd').format(now)}.zip';
 
-  Future<Uint8List> buildZip({required DateTime now}) async {
-    final List<StudyCard> cards = await _repository.listCardsForExport();
+  /// 打包成 zip。
+  ///
+  /// [selection] 为 null 表示不筛，和以前一样全导。
+  Future<Uint8List> buildZip({
+    required DateTime now,
+    ExportSelection? selection,
+  }) async {
+    final List<StudyCard> all = await _repository.listCardsForExport();
+    final List<StudyCard> cards = selection == null
+        ? all
+        : all.where(selection.includes).toList(growable: false);
     final List<Subject> subjects = await _repository.listSubjects();
 
-    final Archive archive = Archive()
-      ..addFile(_textFile(
+    final Archive archive = Archive();
+
+    // 选中的功能都给一份 Markdown，哪怕一条都没有——文件名可预期，
+    // 比「有时有、有时没有」好懂。没选的功能一个字都不出。
+    final bool allTypes = selection == null;
+    if (allTypes || selection.includesType(CardType.formula)) {
+      archive.addFile(_textFile(
         formulaMarkdownFileName,
         buildFormulaMarkdown(
           cards: _ofType(cards, CardType.formula),
           subjects: subjects,
           now: now,
         ),
-      ))
-      ..addFile(_textFile(
+      ));
+    }
+    if (allTypes || selection.includesType(CardType.idea)) {
+      archive.addFile(_textFile(
         ideaMarkdownFileName,
-        buildIdeaMarkdown(
-          cards: _ofType(cards, CardType.idea),
-          now: now,
-        ),
-      ))
-      ..addFile(_textFile(
+        buildIdeaMarkdown(cards: _ofType(cards, CardType.idea), now: now),
+      ));
+    }
+    if (allTypes || selection.includesType(CardType.memory)) {
+      archive.addFile(_textFile(
         memoryMarkdownFileName,
         buildNotebookMarkdown(
           heading: '记忆卡片',
@@ -56,8 +93,10 @@ class ExportService {
           subjects: subjects,
           now: now,
         ),
-      ))
-      ..addFile(_textFile(
+      ));
+    }
+    if (allTypes || selection.includesType(CardType.mistake)) {
+      archive.addFile(_textFile(
         mistakeMarkdownFileName,
         buildNotebookMarkdown(
           heading: '错题本',
@@ -65,19 +104,24 @@ class ExportService {
           subjects: subjects,
           now: now,
         ),
-      ))
-      ..addFile(_textFile(
+      ));
+    }
+    if (allTypes || selection.includesType(CardType.question)) {
+      archive.addFile(_textFile(
         questionMarkdownFileName,
         buildQuestionMarkdown(
           cards: _ofType(cards, CardType.question),
           subjects: subjects,
           now: now,
         ),
-      ))
-      ..addFile(_textFile(
-        jsonFileName,
-        buildJson(cards: cards, subjects: subjects, now: now),
       ));
+    }
+
+    // data.json 永远生成：它是给导入用的，缺了这份备份就白做了。
+    archive.addFile(_textFile(
+      jsonFileName,
+      buildJson(cards: cards, subjects: subjects, now: now),
+    ));
 
     final Set<String> seen = <String>{};
     for (final StudyCard card in cards) {
@@ -280,7 +324,7 @@ class ExportService {
     required DateTime now,
   }) {
     final Map<String, Object?> payload = <String, Object?>{
-      'app': '万能百宝箱',
+      'app': AppIdentity.backupId,
       'schemaVersion': 1,
       'exportedAt': now.millisecondsSinceEpoch,
       'exportedAtText': DateFormat('yyyy-MM-dd HH:mm').format(now),

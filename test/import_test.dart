@@ -317,6 +317,33 @@ void main() {
     );
   });
 
+  test('改名前导出的老备份还能导进来', () async {
+    final Uint8List bytes = await buildBackup();
+    // 伪造一份 v0.6 那会儿的备份：data.json 里写的还是老名字。
+    final Uint8List old = rewriteJson(bytes, (Map<String, Object?> payload) {
+      payload['app'] = '万能百宝箱';
+    });
+    await wipe();
+
+    final ImportResult result = await importer.run(old, mode: ImportMode.merge);
+
+    expect(result.cardsImported, 2);
+    expect(result.warnings, isEmpty);
+  });
+
+  test('别人家的备份包还是会被拒', () async {
+    final Uint8List bytes = await buildBackup();
+    final Uint8List alien =
+        rewriteJson(bytes, (Map<String, Object?> payload) {
+      payload['app'] = '别人的备份';
+    });
+
+    await expectLater(
+      importer.run(alien, mode: ImportMode.merge),
+      throwsA(isA<ImportException>()),
+    );
+  });
+
   test('导出 → 导入 → 再导出：卡片内容一模一样', () async {
     final Uint8List first = await buildBackup();
     await wipe();
