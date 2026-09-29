@@ -6,6 +6,7 @@ import '../../data/card_repository.dart';
 import '../../models/study_card.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_background.dart';
+import '../../widgets/add_star.dart';
 import '../../widgets/card_tile.dart';
 import '../../widgets/empty_hint.dart';
 import '../../widgets/filter_pill.dart';
@@ -193,7 +194,8 @@ class _IdeaListScreenState extends State<IdeaListScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _createCard,
         tooltip: '写灵感',
-        child: const Icon(Icons.add, size: 26),
+        // 「＋」是那颗星星，见 widgets/add_star.dart。
+        child: const AddStar(size: AppSize.iconBlock),
       ),
       body: Column(
         children: <Widget>[

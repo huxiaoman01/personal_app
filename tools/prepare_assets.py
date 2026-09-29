@@ -6,6 +6,7 @@
   2. 拍立得截图 → app 图标（含自适应图标的前景层）
   3. 米黄底的手绘线稿 → 「纯白 + alpha」的装饰图（列表页背景，见 lib/widgets/app_background.dart）
   4. 白底的贴纸图 → 透明 PNG（复习结束页那张举着对勾的小图）
+  5. 淡蓝底的贴纸图 → 透明 PNG（全 app 的「＋」号星星）
 
 这是**一次性**脚本：源图不进货，跑完把 assets/ 下的产物提交即可。
 源图在本机上的绝对路径属于私人信息，不进版本库，所以一律从命令行参数或
@@ -33,6 +34,7 @@ HUB_DIR = ROOT / "assets" / "hub"
 ICON_DIR = ROOT / "assets" / "icon"
 DECOR_DIR = ROOT / "assets" / "decor"
 CELEBRATE_DIR = ROOT / "assets" / "celebrate"
+STAR_DIR = ROOT / "assets" / "star"
 
 # 源图目录：环境变量给个默认值，命令行 --source-dir 优先级更高。
 DEFAULT_SOURCE_DIR = os.environ.get("BAIBAOXIANG_SOURCE_DIR", r"C:\path\to\sources")
@@ -51,6 +53,7 @@ HUB_SOURCE_NAMES = [
 ICON_SOURCE_NAME = "app_icon_source.jpg"
 DECOR_SOURCE_NAME = "decor_source.png"
 CELEBRATE_SOURCE_NAME = "finish_mark_source.jpg"
+STAR_SOURCE_NAME = "star_source.jpg"
 
 # 拍立得白框里面的画（实测值）。
 ICON_INNER_BOX = (224, 200, 808, 730)  # left, top, right, bottom -> 584 x 530
@@ -61,10 +64,16 @@ MARKER = (255, 0, 255)
 HUB_SIZE = 256
 ICON_SIZE = 1024
 CELEBRATE_SIZE = 512
+STAR_SIZE = 512
 
 # 白底抠图时的容差：和四个角上的颜色差多少以内算「背景」。
 # 白底图比黑底图好抠——线条有深色描边，边界很清楚。
 CELEBRATE_WHITE_THRESHOLD = 30
+
+# 「按四角颜色抠底」的容差。星星那张是淡蓝底、白色描边的贴纸：
+# 白描边和淡蓝底的色差是 21+13+2=36，所以 30 这个值刚好保住描边、
+# 又能把底子抠干净。
+FLAT_THRESHOLD = 30
 
 # 装饰线稿：三块图案在原图里的位置（左, 上, 右, 下），实测值。
 # 原图 1600x2848 三块纵向排开，右下角还有一行「豆包AI生成」水印——
@@ -183,6 +192,40 @@ def keep_main_subject(rgba: Image.Image) -> Image.Image:
     return result
 
 
+def _color_diff(a: tuple[int, ...], b: tuple[int, ...]) -> int:
+    return sum(abs(int(x) - int(y)) for x, y in zip(a, b))
+
+
+def strip_flat_background(img: Image.Image, threshold: int) -> Image.Image:
+    """把四周那圈「纯色底」抠成透明，底色直接取左下角的那个颜色。
+
+    比 [strip_white_background] 通用：白底、淡蓝底都能用同一个函数。
+    取左下角而不是四角平均值，是因为截图常常在最上面留一条黑边，
+    黑的会把平均值带偏。
+
+    只在「贴纸有白色描边」时才需要小心：描边和底色的色差要大于 threshold，
+    不然描边会被一起抠掉（具体数值见 FLAT_THRESHOLD 的注释）。
+    """
+    rgb = img.convert("RGB")
+    width, height = rgb.size
+    work = rgb.copy()
+    background = work.getpixel((0, height - 1))
+
+    seeds = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+    for seed in seeds:
+        if _color_diff(work.getpixel(seed), background) <= threshold:
+            ImageDraw.floodfill(work, seed, MARKER, thresh=threshold)
+
+    marker_layer = Image.new("RGB", (width, height), MARKER)
+    is_background = ImageChops.difference(work, marker_layer).convert("L").point(
+        lambda v: 255 if v == 0 else 0
+    )
+
+    rgba = rgb.convert("RGBA")
+    rgba.putalpha(is_background.point(lambda v: 0 if v == 255 else 255))
+    return rgba
+
+
 def normalize_square(img: Image.Image, size: int, margin_ratio: float = 0.06) -> Image.Image:
     """按不透明区域裁掉空白，再补成正方形并统一尺寸。
 
@@ -270,6 +313,17 @@ def build_celebrate(source: Image.Image) -> Image.Image:
     return normalize_square(keep_main_subject(cut), CELEBRATE_SIZE)
 
 
+def build_star(source: Image.Image) -> Image.Image:
+    """淡蓝底的星星贴纸 → 透明 PNG，用来当全 app 的「＋」号。
+
+    只留最大的一块连通区域：这样星星外面的小圆点、右边那行「好困好困呀」
+    的手写字、以及截图顶上那条黑边都会自动消失——做成 24px 的小图标时，
+    它们本来也只会变成噪点。
+    """
+    cut = strip_flat_background(source, FLAT_THRESHOLD)
+    return normalize_square(keep_main_subject(cut), STAR_SIZE)
+
+
 def _background_luminance(gray: Image.Image) -> int:
     """一块图里绝大多数像素都是纸，取 95 分位当背景亮度。
 
@@ -304,6 +358,11 @@ def main() -> int:
         help=f"单独指定结束页贴纸的路径，默认是 <source-dir>/{CELEBRATE_SOURCE_NAME}",
     )
     parser.add_argument(
+        "--star-source",
+        default=None,
+        help=f"单独指定「＋」号星星的路径，默认是 <source-dir>/{STAR_SOURCE_NAME}",
+    )
+    parser.add_argument(
         "--threshold",
         type=int,
         default=45,
@@ -324,10 +383,18 @@ def main() -> int:
         if args.celebrate_source
         else source_dir / CELEBRATE_SOURCE_NAME
     )
+    star_source = (
+        Path(args.star_source)
+        if args.star_source
+        else source_dir / STAR_SOURCE_NAME
+    )
 
     missing = [
         p
-        for p in hub_sources + [icon_source, decor_source, celebrate_source]
+        for p in (
+            hub_sources
+            + [icon_source, decor_source, celebrate_source, star_source]
+        )
         if not p.exists()
     ]
     if missing:
@@ -344,6 +411,7 @@ def main() -> int:
     ICON_DIR.mkdir(parents=True, exist_ok=True)
     DECOR_DIR.mkdir(parents=True, exist_ok=True)
     CELEBRATE_DIR.mkdir(parents=True, exist_ok=True)
+    STAR_DIR.mkdir(parents=True, exist_ok=True)
 
     for index, source_path in enumerate(hub_sources, start=1):
         with Image.open(source_path) as raw:
@@ -384,6 +452,16 @@ def main() -> int:
     print(
         f"finish_mark.png  {celebrate.size[0]}x{celebrate.size[1]}"
         f"  不透明像素 {opaque / (CELEBRATE_SIZE ** 2):.0%}"
+    )
+
+    with Image.open(star_source) as raw:
+        star = build_star(raw)
+    star.save(STAR_DIR / "star.png")
+    histogram = star.getchannel("A").histogram()
+    opaque = sum(histogram[129:])
+    print(
+        f"star.png  {star.size[0]}x{star.size[1]}"
+        f"  不透明像素 {opaque / (STAR_SIZE ** 2):.0%}"
     )
     return 0
 

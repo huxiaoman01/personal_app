@@ -4,6 +4,7 @@ import '../../app_globals.dart';
 import '../../models/subject.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/empty_hint.dart';
+import '../../widgets/add_star.dart';
 
 /// 科目管理：拖动排序、改名、删除。删除时把卡片转成「未分类」。
 class SubjectManageScreen extends StatefulWidget {
@@ -254,7 +255,7 @@ class _SubjectManageScreenState extends State<SubjectManageScreen> {
                   top: false,
                   child: TextButton.icon(
                     onPressed: _add,
-                    icon: Icon(Icons.add, size: 20, color: p.primary),
+                    icon: const AddStar(size: 24),
                     label: Text(
                       '添加科目',
                       style: AppText.body.copyWith(color: p.primary),

@@ -8,6 +8,7 @@ import 'package:baibaoxiang/data/subject_cache.dart';
 import 'package:baibaoxiang/features/idea/idea_list_screen.dart';
 import 'package:baibaoxiang/models/study_card.dart';
 import 'package:baibaoxiang/theme/app_theme.dart';
+import 'package:baibaoxiang/widgets/add_star.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -82,6 +83,19 @@ void main() {
     expect(find.textContaining('还没有灵感'), findsOneWidget);
   });
 
+  testWidgets('右下角的「＋」是那颗星星，不是原来的 Material 加号',
+      (WidgetTester tester) async {
+    await pumpIdeaPage(tester);
+
+    final Finder fab = find.byType(FloatingActionButton);
+    expect(fab, findsOneWidget);
+    expect(
+      find.descendant(of: fab, matching: find.byType(AddStar)),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.add), findsNothing);
+  });
+
   testWidgets('点右下角 + 写一条：标题、正文都能存，保存后回到列表',
       (WidgetTester tester) async {
     await pumpIdeaPage(tester);
@@ -90,11 +104,11 @@ void main() {
     await settle(tester);
 
     // 新建的页面就得能加照片，不能等写完了再回来补。
-    // 只认图片网格里的那个 + 号——列表页的 FAB 上也有一个 +，别认错了。
+    // 只认图片网格里的那颗星星——列表页的 FAB 上也有同一颗，别认错了。
     expect(
       find.descendant(
         of: find.byType(GridView),
-        matching: find.byIcon(Icons.add),
+        matching: find.byType(AddStar),
       ),
       findsOneWidget,
     );

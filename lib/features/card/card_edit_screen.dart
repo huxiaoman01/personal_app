@@ -8,6 +8,7 @@ import '../../app_globals.dart';
 import '../../models/study_card.dart';
 import '../../models/subject.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/add_star.dart';
 import '../../widgets/image_viewer.dart';
 import '../../widgets/sheet_action.dart';
 import '../../widgets/tag_chip.dart';
@@ -594,7 +595,8 @@ class _ImageGrid extends StatelessWidget {
                 radius: AppRadius.thumb,
               ),
               child: Center(
-                child: Icon(Icons.add, size: 24, color: p.textTertiary),
+                // 这一格也是「＋」，跟着换成星星。
+                child: const AddStar(size: 32),
               ),
             ),
           );
@@ -745,7 +747,7 @@ class _TagField extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Icon(Icons.add, size: 14, color: p.textTertiary),
+                    const AddStar(size: 18),
                     const SizedBox(width: AppSpace.xs),
                     Text(
                       '加标签',

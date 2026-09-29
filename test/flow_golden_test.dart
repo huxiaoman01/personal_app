@@ -6,10 +6,12 @@ import 'package:baibaoxiang/data/card_repository.dart';
 import 'package:baibaoxiang/data/image_store.dart';
 import 'package:baibaoxiang/data/subject_cache.dart';
 import 'package:baibaoxiang/features/card/card_feature.dart';
+import 'package:baibaoxiang/features/card/card_edit_screen.dart';
 import 'package:baibaoxiang/features/card/card_library_screen.dart';
 import 'package:baibaoxiang/features/export/export_select_screen.dart';
 import 'package:baibaoxiang/models/study_card.dart';
 import 'package:baibaoxiang/theme/app_theme.dart';
+import 'package:baibaoxiang/widgets/add_star.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -158,6 +160,22 @@ void main() {
     await expectLater(
       find.byType(MaterialApp),
       matchesGoldenFile('goldens/review_finished_light.png'),
+    );
+  });
+
+  testWidgets('新增灵感页：加图格子和加标签上的「＋」', (WidgetTester tester) async {
+    await pump(tester, const CardEditScreen(type: CardType.idea));
+
+    // 星星是异步解码的，不等它解完 golden 里就是空的。
+    final BuildContext context = tester.element(find.byType(Scaffold).last);
+    await tester.runAsync(() async {
+      await precacheImage(const AssetImage(kAddStarAsset), context);
+    });
+    await settle(tester);
+
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('goldens/card_edit_light.png'),
     );
   });
 }

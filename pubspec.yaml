@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.7.0+7
+version: 0.8.0+8
 
 environment:
   sdk: ^3.13.4
@@ -76,6 +76,8 @@ flutter:
     - assets/decor/
     # 复习结束页那张举着对勾的小图（白底贴纸抠成透明 PNG）。
     - assets/celebrate/
+    # 全 app 的「＋」号图案（淡蓝底贴纸抠成透明 PNG）。
+    - assets/star/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

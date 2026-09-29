@@ -181,6 +181,14 @@ lib/
   - 唯一的例外：复习结束页那张图案的「从小到大出现」（用户点名要的）。
     见 `card_review_screen.dart` 的 `_FinishedView.finishMarkAsset`。
 
+另外两条和素材有关的约定：
+
+- **「＋」号统一用 `AddStar`**（那颗黄蓝渐变的星星），不要再换回
+  `Icons.add`。新增「＋」时 import `widgets/add_star.dart` 即可。
+- 复习结束页的图案和「＋」号星星都是用户给的贴纸，由
+  `tools/prepare_assets.py` 抠成透明 PNG。别给它们套 `color`——一染色
+  那身黄蓝渐变就没了。
+
 ### 交互
 
 - 可点区域 ≥ `44×44`；点击即刻响应，不做延迟跳转

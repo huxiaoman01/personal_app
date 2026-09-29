@@ -7,6 +7,7 @@ import '../../models/study_card.dart';
 import '../../models/subject.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_background.dart';
+import '../../widgets/add_star.dart';
 import '../../widgets/card_tile.dart';
 import '../../widgets/empty_hint.dart';
 import '../../widgets/filter_pill.dart';
@@ -160,7 +161,8 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _createCard,
         tooltip: '新增问题',
-        child: const Icon(Icons.add, size: 26),
+        // 「＋」是那颗星星，见 widgets/add_star.dart。
+        child: const AddStar(size: AppSize.iconBlock),
       ),
       body: Column(
         children: <Widget>[

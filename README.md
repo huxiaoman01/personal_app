@@ -58,9 +58,9 @@ flutter build apk --release
 
 ## 素材脚本
 
-首页的六张角色贴纸、应用图标、列表页背景的那三个图案，都是
-`tools/prepare_assets.py` 从一个源图目录处理出来的。源图不进版本库，
-路径通过参数或环境变量给：
+首页的六张角色贴纸、应用图标、列表页背景的那三个图案、复习结束页的
+对勾小人、全 app 的「＋」号星星，都是 `tools/prepare_assets.py` 从一个
+源图目录处理出来的。源图不进版本库，路径通过参数或环境变量给：
 
 ```powershell
 python tools/prepare_assets.py --source-dir D:\素材\2026-09
