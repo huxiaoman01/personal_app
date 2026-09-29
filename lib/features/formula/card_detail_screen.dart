@@ -4,9 +4,12 @@ import 'package:intl/intl.dart';
 import '../../app_globals.dart';
 import '../../models/study_card.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/card_image_pager.dart';
 import '../../widgets/empty_hint.dart';
+import '../../widgets/image_viewer.dart';
 import '../../widgets/sheet_action.dart';
-import 'card_edit_screen.dart';
+import '../card/card_edit_screen.dart';
+import '../card/card_feature.dart';
 
 /// 卡片详情：大图 + 标题 + 注释 + 元信息。
 class CardDetailScreen extends StatefulWidget {
@@ -50,7 +53,8 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     if (card == null) return;
     final bool? saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (BuildContext _) => CardEditScreen(card: card),
+        builder: (BuildContext _) =>
+            CardEditScreen(type: card.type, card: card),
       ),
     );
     if (saved ?? false) await _load();
@@ -87,13 +91,10 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
   Future<void> _openFullscreen(int initialIndex) async {
     final StudyCard? card = _card;
     if (card == null) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (BuildContext _) => _FullscreenImages(
-          names: card.images,
-          initialIndex: initialIndex,
-        ),
-      ),
+    await openImageViewer(
+      context,
+      names: card.images,
+      initialIndex: initialIndex,
     );
   }
 
@@ -152,12 +153,23 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     );
     final String subject = subjectCache.labelOf(card);
     final String content = (card.content ?? '').trim();
+    // 靠复习的功能（记忆卡、错题本）多显示一行次数——复习就是按它排序的。
+    final CardFeature? feature = cardFeatureOf(card.type);
+    final String meta;
+    if (feature == null) {
+      meta = '$subject · $created';
+    } else if (card.forgotCount == 0) {
+      meta = '$subject · 还没复习 · $created';
+    } else {
+      meta =
+          '$subject · ${feature.reviewedWord} ${card.forgotCount} 次 · $created';
+    }
 
     return ListView(
       padding: const EdgeInsets.only(bottom: AppSpace.xl),
       children: <Widget>[
         if (card.images.isNotEmpty) ...<Widget>[
-          _ImagePager(
+          CardImagePager(
             names: card.images,
             page: _page,
             onPageChanged: (int i) => setState(() => _page = i),
@@ -183,148 +195,13 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
               const Divider(height: 1, thickness: 1),
               const SizedBox(height: AppSpace.md),
               Text(
-                '$subject · $created',
+                meta,
                 style: AppText.badge.copyWith(color: p.textTertiary),
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ImagePager extends StatelessWidget {
-  const _ImagePager({
-    required this.names,
-    required this.page,
-    required this.onPageChanged,
-    required this.onTap,
-  });
-
-  final List<String> names;
-  final int page;
-  final ValueChanged<int> onPageChanged;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final AppPalette p = context.palette;
-    return Column(
-      children: <Widget>[
-        SizedBox(
-          height: 280,
-          child: PageView.builder(
-            itemCount: names.length,
-            onPageChanged: onPageChanged,
-            itemBuilder: (BuildContext context, int index) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSize.pagePadding,
-                ),
-                child: GestureDetector(
-                  onTap: () => onTap(index),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    child: Container(
-                      color: p.iconBlock,
-                      alignment: Alignment.center,
-                      child: Image.file(
-                        imageStore.fileOf(names[index]),
-                        fit: BoxFit.contain,
-                        errorBuilder: (
-                          BuildContext _,
-                          Object _,
-                          StackTrace? _,
-                        ) =>
-                            Icon(
-                          Icons.broken_image_outlined,
-                          size: 32,
-                          color: p.textTertiary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        if (names.length > 1) ...<Widget>[
-          const SizedBox(height: AppSpace.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              for (int i = 0; i < names.length; i++)
-                Container(
-                  width: 6,
-                  height: 6,
-                  margin: const EdgeInsets.symmetric(horizontal: AppSpace.xs),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: i == page ? p.primary : p.divider,
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-/// 全屏看图：左右滑动 + 双指缩放。
-class _FullscreenImages extends StatefulWidget {
-  const _FullscreenImages({required this.names, required this.initialIndex});
-
-  final List<String> names;
-  final int initialIndex;
-
-  @override
-  State<_FullscreenImages> createState() => _FullscreenImagesState();
-}
-
-class _FullscreenImagesState extends State<_FullscreenImages> {
-  late final PageController _controller =
-      PageController(initialPage: widget.initialIndex);
-  late int _page = widget.initialIndex;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // 看图页用接近纯黑的深蓝，不参与 app 大面的浅色底。
-    const Color viewerBg = Color(0xFF0A1220);
-    return Scaffold(
-      backgroundColor: viewerBg,
-      appBar: AppBar(
-        backgroundColor: viewerBg,
-        foregroundColor: Colors.white,
-        title: Text(
-          '${_page + 1} / ${widget.names.length}',
-          style: AppText.caption.copyWith(color: Colors.white),
-        ),
-      ),
-      body: PageView.builder(
-        controller: _controller,
-        itemCount: widget.names.length,
-        onPageChanged: (int i) => setState(() => _page = i),
-        itemBuilder: (BuildContext context, int index) {
-          return InteractiveViewer(
-            maxScale: 5,
-            child: Center(
-              child: Image.file(
-                imageStore.fileOf(widget.names[index]),
-                fit: BoxFit.contain,
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }

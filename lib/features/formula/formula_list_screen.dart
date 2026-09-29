@@ -6,12 +6,14 @@ import '../../data/card_repository.dart';
 import '../../models/study_card.dart';
 import '../../models/subject.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_background.dart';
 import '../../widgets/card_tile.dart';
 import '../../widgets/empty_hint.dart';
+import '../../widgets/filter_pill.dart';
 import '../../widgets/sheet_action.dart';
+import '../card/card_edit_screen.dart';
 import '../subjects/subject_manage_screen.dart';
 import 'card_detail_screen.dart';
-import 'card_edit_screen.dart';
 
 /// 公式手册主列表：科目筛选条 + 一行一张的卡片列表。
 class FormulaListScreen extends StatefulWidget {
@@ -74,7 +76,8 @@ class _FormulaListScreenState extends State<FormulaListScreen> {
   Future<void> _createCard() async {
     final bool? saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (BuildContext _) => const CardEditScreen(),
+        builder: (BuildContext _) =>
+            const CardEditScreen(type: CardType.formula),
       ),
     );
     if (saved ?? false) await _reload();
@@ -142,7 +145,7 @@ class _FormulaListScreenState extends State<FormulaListScreen> {
                       horizontal: AppSize.pagePadding,
                     ),
                     children: <Widget>[
-                      _FilterPill(
+                      FilterPill(
                         label: '全部',
                         selected: _filter.key == 'all',
                         onTap: () {
@@ -151,7 +154,7 @@ class _FormulaListScreenState extends State<FormulaListScreen> {
                         },
                       ),
                       for (final Subject s in _subjects)
-                        _FilterPill(
+                        FilterPill(
                           label: s.name,
                           selected: _filter.key == 'id:${s.id}',
                           onTap: () {
@@ -161,7 +164,7 @@ class _FormulaListScreenState extends State<FormulaListScreen> {
                             _reload();
                           },
                         ),
-                      _FilterPill(
+                      FilterPill(
                         label: '未分类',
                         selected: _filter.key == 'none',
                         onTap: () {
@@ -189,7 +192,8 @@ class _FormulaListScreenState extends State<FormulaListScreen> {
             ),
           ),
           const Divider(height: 1, thickness: 1),
-          Expanded(child: _buildList()),
+          // 背景图案只铺在列表这块：标题栏和科目筛选条保持干净。
+          Expanded(child: AppBackground(child: _buildList())),
         ],
       ),
     );
@@ -227,49 +231,6 @@ class _FormulaListScreenState extends State<FormulaListScreen> {
           onLongPress: () => _showCardMenu(card),
         );
       },
-    );
-  }
-}
-
-class _FilterPill extends StatelessWidget {
-  const _FilterPill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final AppPalette p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.only(right: AppSpace.sm),
-      child: Center(
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpace.md,
-              vertical: AppSpace.sm,
-            ),
-            decoration: BoxDecoration(
-              color: selected ? p.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            child: Text(
-              label,
-              style: AppText.caption.copyWith(
-                color: selected ? p.onPrimary : p.textSecondary,
-                fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

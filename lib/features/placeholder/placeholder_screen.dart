@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
 
-/// 五个还没做的功能的占位页。
+/// 还没做的功能的占位页（错题本、问题收集箱、考点大纲）。
 class PlaceholderScreen extends StatelessWidget {
   const PlaceholderScreen({super.key, required this.title});
 

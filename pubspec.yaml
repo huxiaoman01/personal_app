@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.0+1
+version: 0.6.0+6
 
 environment:
   sdk: ^3.13.4
@@ -54,6 +54,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   sqflite_common_ffi: ^2.4.3
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -66,10 +67,13 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # 首页六个功能入口右侧的角色贴纸（透明 PNG）。
+  # 源图是黑底 JPEG，由 tools/prepare_assets.py 处理生成。
+  assets:
+    - assets/hub/
+    # 列表页背景上那三个淡淡的图案（纯白 + alpha，颜色由主题给）。
+    # 源图是米黄底的手绘线稿，由 tools/prepare_assets.py 处理生成。
+    - assets/decor/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -96,3 +100,15 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# 应用图标：从 assets/icon 里的两张 PNG 生成安卓各分辨率的图标。
+#   app_icon.png            完整方形图标（老版本安卓用）
+#   app_icon_foreground.png 自适应图标的前景层，背景取米黄 #FDF8EF
+# 改了图标之后跑一次：dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#FDF8EF"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  min_sdk_android: 24

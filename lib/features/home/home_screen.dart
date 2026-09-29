@@ -4,64 +4,85 @@ import '../../app_globals.dart';
 import '../../models/study_card.dart';
 import '../../theme/app_theme.dart';
 import '../export/export_sheet.dart';
+import '../export/import_sheet.dart';
 import '../formula/formula_list_screen.dart';
+import '../idea/idea_list_screen.dart';
+import '../card/card_feature.dart';
+import '../card/card_library_screen.dart';
 import '../placeholder/placeholder_screen.dart';
+import '../question/question_list_screen.dart';
 import '../trash/trash_screen.dart';
 import 'search_screen.dart';
 
-/// 首页六宫格的一项。
-class _HubEntry {
-  const _HubEntry({
+/// 首页的一个功能入口。
+///
+/// 定义成公开常量（而不是文件私有的）是为了让测试能直接检查它——
+/// 六个入口、配图路径、描述文案都能被测试守住。
+class HubEntry {
+  const HubEntry({
     required this.label,
-    required this.icon,
+    required this.description,
+    required this.asset,
     required this.ready,
     this.type,
   });
 
   final String label;
-  final IconData icon;
 
-  /// v0 只有公式手册能点开。
+  /// 第二行的说明文字。
+  final String description;
+
+  /// 右侧配图，透明 PNG。
+  final String asset;
+
+  /// 已经做完、能点开的功能。没做完的点进去是占位页。
   final bool ready;
 
   /// 对应的卡片类型；考点大纲不是卡片，所以是 null。
   final String? type;
 }
 
-const List<_HubEntry> _entries = <_HubEntry>[
-  _HubEntry(
+/// 顺序就是首页从上到下的顺序，右侧配图也按这个顺序。
+const List<HubEntry> kHubEntries = <HubEntry>[
+  HubEntry(
     label: '公式手册',
-    icon: Icons.functions,
+    description: '各科常忘公式，拍照存下来随时查',
+    asset: 'assets/hub/hub_1.png',
     ready: true,
     type: CardType.formula,
   ),
-  _HubEntry(
+  HubEntry(
     label: '灵感记录',
-    icon: Icons.lightbulb_outline,
-    ready: false,
+    description: '想到就写，自动记时间，可打标签',
+    asset: 'assets/hub/hub_2.png',
+    ready: true,
     type: CardType.idea,
   ),
-  _HubEntry(
+  HubEntry(
     label: '记忆卡片',
-    icon: Icons.style_outlined,
-    ready: false,
+    description: '导入简答题，今天明天简单复习',
+    asset: 'assets/hub/hub_3.png',
+    ready: true,
     type: CardType.memory,
   ),
-  _HubEntry(
+  HubEntry(
     label: '错题本',
-    icon: Icons.error_outline,
-    ready: false,
+    description: '记下做错的题和错在哪一步',
+    asset: 'assets/hub/hub_4.png',
+    ready: true,
     type: CardType.mistake,
   ),
-  _HubEntry(
+  HubEntry(
     label: '问题收集箱',
-    icon: Icons.help_outline,
-    ready: false,
+    description: '不会的先记下，问完再回填答案',
+    asset: 'assets/hub/hub_5.png',
+    ready: true,
     type: CardType.question,
   ),
-  _HubEntry(
+  HubEntry(
     label: '考点大纲',
-    icon: Icons.check_circle_outline,
+    description: '大纲知识点打勾，看掌握进度',
+    asset: 'assets/hub/hub_6.png',
     ready: false,
   ),
 ];
@@ -74,7 +95,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  /// 每种类型各有多少张。
   Map<String, int> _counts = const <String, int>{};
+
+  /// 还没有答案的问题有几条。
+  ///
+  /// 首页别的数字都是「这个功能里一共多少条」，只有问题收集箱要的是
+  /// 「还欠着几条」——那才是这个数字存在的意义。
+  int _pendingQuestions = 0;
 
   @override
   void initState() {
@@ -83,24 +111,44 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _reload() async {
-    final Map<String, int> counts = await cardRepository.countByType();
+    // 两个统计一起发出去：都是读同一张表，没有先后关系，串着等只是白等一轮。
+    final Future<Map<String, int>> counts =
+        cardRepository.countByType();
+    final Future<int> pending =
+        cardRepository.countPendingCards(type: CardType.question);
+    final Map<String, int> byType = await counts;
+    final int pendingQuestions = await pending;
     if (!mounted) return;
-    setState(() => _counts = counts);
+    setState(() {
+      _counts = byType;
+      _pendingQuestions = pendingQuestions;
+    });
   }
 
-  Future<void> _openEntry(_HubEntry entry) async {
+  /// 已经做完的入口按类型分发到各自的列表页；没做完的先给占位页。
+  Widget _pageFor(HubEntry entry) {
     if (!entry.ready) {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (BuildContext _) =>
-              PlaceholderScreen(title: entry.label),
-        ),
-      );
-      return;
+      return PlaceholderScreen(title: entry.label);
     }
+    if (entry.type == CardType.idea) return const IdeaListScreen();
+    if (entry.type == CardType.question) return const QuestionListScreen();
+    // 记忆卡和错题本共用同一个卡片库页面，按类型查配置就行。
+    final CardFeature? feature = cardFeatureOf(entry.type);
+    if (feature != null) return CardLibraryScreen(feature: feature);
+    return const FormulaListScreen();
+  }
+
+  /// 入口右边那个数字。考点大纲不是卡片，所以是 null（显示「待开发」）。
+  int? _countFor(HubEntry entry) {
+    if (entry.type == null) return null;
+    if (entry.type == CardType.question) return _pendingQuestions;
+    return _counts[entry.type] ?? 0;
+  }
+
+  Future<void> _openEntry(HubEntry entry) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (BuildContext _) => const FormulaListScreen(),
+        builder: (BuildContext _) => _pageFor(entry),
       ),
     );
     await _reload();
@@ -117,6 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<void>(builder: (BuildContext _) => const TrashScreen()),
     );
     await _reload();
+  }
+
+  /// 导入成功会让各个入口的数字全变，所以拿返回值决定要不要重算一遍。
+  Future<void> _openImport() async {
+    final bool imported = await showImportSheet(context);
+    if (imported) await _reload();
   }
 
   @override
@@ -139,6 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: AppSpace.xl),
                   _MoreButton(
                     onExport: () => showExportSheet(context),
+                    onImport: _openImport,
                     onTrash: _openTrash,
                   ),
                 ],
@@ -146,26 +201,21 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: AppSpace.xl),
             Expanded(
-              child: GridView.builder(
+              child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(
                   AppSize.pagePadding,
                   0,
                   AppSize.pagePadding,
                   AppSpace.xl,
                 ),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisExtent: 104,
-                  crossAxisSpacing: AppSpace.lg,
-                  mainAxisSpacing: 20,
-                ),
-                itemCount: _entries.length,
+                itemCount: kHubEntries.length,
+                separatorBuilder: (BuildContext _, int _) =>
+                    const SizedBox(height: AppSpace.md),
                 itemBuilder: (BuildContext context, int index) {
-                  final _HubEntry entry = _entries[index];
-                  return _HubCard(
+                  final HubEntry entry = kHubEntries[index];
+                  return _HubRow(
                     entry: entry,
-                    count: entry.type == null ? null : (_counts[entry.type] ?? 0),
+                    count: _countFor(entry),
                     onTap: () => _openEntry(entry),
                   );
                 },
@@ -203,7 +253,7 @@ class _SearchEntry extends StatelessWidget {
             const SizedBox(width: AppSpace.sm),
             Expanded(
               child: Text(
-                '搜公式、灵感、错题…',
+                '搜公式、灵感、记忆…',
                 style: AppText.caption.copyWith(color: p.textTertiary),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -217,9 +267,14 @@ class _SearchEntry extends StatelessWidget {
 }
 
 class _MoreButton extends StatelessWidget {
-  const _MoreButton({required this.onExport, required this.onTrash});
+  const _MoreButton({
+    required this.onExport,
+    required this.onImport,
+    required this.onTrash,
+  });
 
   final VoidCallback onExport;
+  final VoidCallback onImport;
   final VoidCallback onTrash;
 
   @override
@@ -239,6 +294,7 @@ class _MoreButton extends StatelessWidget {
         ),
         onSelected: (String value) {
           if (value == 'export') onExport();
+          if (value == 'import') onImport();
           if (value == 'trash') onTrash();
         },
         itemBuilder: (BuildContext _) => <PopupMenuEntry<String>>[
@@ -246,6 +302,13 @@ class _MoreButton extends StatelessWidget {
             value: 'export',
             child: Text(
               '导出全部数据',
+              style: AppText.body.copyWith(color: p.text),
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'import',
+            child: Text(
+              '导入数据',
               style: AppText.body.copyWith(color: p.text),
             ),
           ),
@@ -262,14 +325,15 @@ class _MoreButton extends StatelessWidget {
   }
 }
 
-class _HubCard extends StatelessWidget {
-  const _HubCard({
+/// 一个整宽的功能按钮：左边名称 + 描述，右边角色贴纸。
+class _HubRow extends StatelessWidget {
+  const _HubRow({
     required this.entry,
     required this.count,
     required this.onTap,
   });
 
-  final _HubEntry entry;
+  final HubEntry entry;
   final int? count;
   final VoidCallback onTap;
 
@@ -277,41 +341,73 @@ class _HubCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final int? n = count;
+    final BorderRadius radius = BorderRadius.circular(AppRadius.card);
 
     return Opacity(
       opacity: entry.ready ? 1 : 0.4,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        overlayColor: WidgetStatePropertyAll<Color>(
-          p.primary.withValues(alpha: 0.08),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Container(
-              width: AppSize.iconBlock,
-              height: AppSize.iconBlock,
-              decoration: BoxDecoration(
-                color: p.iconBlock,
-                borderRadius: BorderRadius.circular(AppRadius.iconBlock),
+      child: Material(
+        color: p.iconBlock,
+        borderRadius: radius,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          overlayColor: WidgetStatePropertyAll<Color>(
+            p.primary.withValues(alpha: 0.08),
+          ),
+          child: SizedBox(
+            height: AppSize.hubRowHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Flexible(
+                              child: Text(
+                                entry.label,
+                                style:
+                                    AppText.listTitle.copyWith(color: p.text),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpace.sm),
+                            Text(
+                              n == null ? '待开发' : '$n',
+                              style: AppText.badge.copyWith(
+                                color: p.textTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpace.xs),
+                        Text(
+                          entry.description,
+                          style: AppText.caption.copyWith(
+                            color: p.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.md),
+                  Image.asset(
+                    entry.asset,
+                    width: AppSize.hubThumb,
+                    height: AppSize.hubThumb,
+                    fit: BoxFit.contain,
+                  ),
+                ],
               ),
-              child: Icon(entry.icon, size: 22, color: p.primary),
             ),
-            const SizedBox(height: AppSpace.sm),
-            Text(
-              entry.label,
-              style: AppText.listTitle.copyWith(color: p.text),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: AppSpace.xs),
-            Text(
-              n == null ? '待开发' : '$n 张',
-              style: AppText.badge.copyWith(color: p.textSecondary),
-            ),
-          ],
+          ),
         ),
       ),
     );

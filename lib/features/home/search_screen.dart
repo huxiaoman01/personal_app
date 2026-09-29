@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 import '../../app_globals.dart';
 import '../../models/study_card.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_background.dart';
 import '../../widgets/card_tile.dart';
 import '../../widgets/empty_hint.dart';
-import '../formula/card_detail_screen.dart';
+import '../card/card_routes.dart';
 
 /// 跨全部卡片类型的全局搜索。结果按功能分组。
 class SearchScreen extends StatefulWidget {
@@ -63,11 +64,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _openCard(StudyCard card) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (BuildContext _) => CardDetailScreen(cardId: card.id!),
-      ),
-    );
+    // 哪种卡片点开去哪个页面，统一交给 routeForCard 判断。
+    await Navigator.of(context).push(routeForCard(card));
     await _run(_controller.text);
   }
 
@@ -85,14 +83,15 @@ class _SearchScreenState extends State<SearchScreen> {
           cursorColor: p.primary,
           decoration: InputDecoration(
             border: InputBorder.none,
-            hintText: '搜公式、灵感、错题…',
+            hintText: '搜公式、灵感、记忆…',
             hintStyle: AppText.body.copyWith(color: p.textTertiary),
           ),
           onChanged: _onChanged,
           onSubmitted: _run,
         ),
       ),
-      body: _buildBody(),
+      // 搜索结果也是一列卡片，铺上和功能列表页同一层背景图案。
+      body: AppBackground(child: _buildBody()),
     );
   }
 
@@ -136,8 +135,12 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// 搜索结果的第二行优先显示科目标签，比注释更有辨识度。
+  /// 搜索结果的第二行：灵感显示标签，其余显示科目标签。
+  /// 这两个都比正文更有辨识度，一眼能看出这条是干什么的。
   String? _subtitleOf(StudyCard card) {
+    if (card.type == CardType.idea && card.tags.isNotEmpty) {
+      return card.tags.map((String t) => '#$t').join('  ');
+    }
     final String subject = subjectCache.labelOf(card);
     return subject.isEmpty ? null : subject;
   }

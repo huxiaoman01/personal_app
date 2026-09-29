@@ -60,6 +60,12 @@ class StudyCard {
 
   bool get isDeleted => deletedAt != null;
 
+  /// 正文 / 答案里有没有真东西。
+  ///
+  /// 「问题收集箱」靠它派生状态：没答案就是待解决，回填了答案就是已解决。
+  /// 只打了空格和换行的算没写——不然一条空卡会莫名其妙变成「已解决」。
+  bool get hasContent => (content ?? '').trim().isNotEmpty;
+
   /// 列表里显示的标题：没标题就退到注释首行。
   String get displayTitle {
     final String t = (title ?? '').trim();

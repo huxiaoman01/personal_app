@@ -9,6 +9,7 @@ import 'package:baibaoxiang/data/image_store.dart';
 import 'package:baibaoxiang/models/study_card.dart';
 import 'package:baibaoxiang/models/subject.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -38,6 +39,12 @@ void main() {
     if (await tempDir.exists()) await tempDir.delete(recursive: true);
   });
 
+  /// 某一种类型的卡片——导出现在按功能分文件，测试也得按类型取。
+  Future<List<StudyCard>> cardsOfType(String type) async {
+    final List<StudyCard> all = await repo.listCardsForExport();
+    return all.where((StudyCard c) => c.type == type).toList();
+  }
+
   test('Markdown 按科目分节，含标题、注释和图片引用', () async {
     final File source = File(p.join(tempDir.path, 'shot.jpg'))
       ..writeAsBytesSync(<int>[1, 2, 3, 4]);
@@ -57,8 +64,8 @@ void main() {
       ),
     );
 
-    final String markdown = exportService.buildMarkdown(
-      cards: await repo.listCardsForExport(),
+    final String markdown = exportService.buildFormulaMarkdown(
+      cards: await cardsOfType(CardType.formula),
       subjects: subjects,
       now: DateTime(2026, 9, 22, 21, 5),
     );
@@ -84,8 +91,8 @@ void main() {
       ),
     );
 
-    final String markdown = exportService.buildMarkdown(
-      cards: await repo.listCardsForExport(),
+    final String markdown = exportService.buildFormulaMarkdown(
+      cards: await cardsOfType(CardType.formula),
       subjects: marks,
       now: DateTime(2026, 9, 22),
     );
@@ -115,7 +122,11 @@ void main() {
     final List<String> names =
         archive.files.map((ArchiveFile f) => f.name).toList();
 
-    expect(names, contains(ExportService.markdownFileName));
+    expect(names, contains(ExportService.formulaMarkdownFileName));
+    expect(names, contains(ExportService.ideaMarkdownFileName));
+    expect(names, contains(ExportService.memoryMarkdownFileName));
+    expect(names, contains(ExportService.mistakeMarkdownFileName));
+    expect(names, contains(ExportService.questionMarkdownFileName));
     expect(names, contains(ExportService.jsonFileName));
     expect(names, contains('images/$imageName'));
   });
@@ -161,7 +172,154 @@ void main() {
   test('导出文件名带日期', () {
     expect(
       exportService.zipFileName(DateTime(2026, 9, 22)),
-      '万能百宝箱_公式手册_20260922.zip',
+      '万能百宝箱_20260922.zip',
     );
+  });
+
+  test('灵感记录 Markdown：有标题用标题，没标题才用创建时间', () async {
+    await repo.insertCard(
+      StudyCard(
+        type: CardType.idea,
+        content: '先写的',
+        tags: <String>['运筹', '易错'],
+        createdAt: 100,
+        updatedAt: 100,
+      ),
+    );
+    final int pinnedId = await repo.insertCard(
+      StudyCard(
+        type: CardType.idea,
+        content: '后写的',
+        createdAt: 200,
+        updatedAt: 200,
+      ),
+    );
+    await repo.setPinned(pinnedId, true);
+    await repo.insertCard(
+      StudyCard(
+        type: CardType.idea,
+        title: '图论复习顺序',
+        content: '先过一遍最短路，再看生成树',
+        createdAt: 300,
+        updatedAt: 300,
+      ),
+    );
+
+    final String markdown = exportService.buildIdeaMarkdown(
+      cards: await cardsOfType(CardType.idea),
+      now: DateTime(2026, 9, 22, 9),
+    );
+
+    expect(markdown, startsWith('# 灵感记录'));
+    expect(markdown, contains('共 3 条'));
+    expect(markdown, contains('标签：运筹、易错'));
+    // 没标题的（含所有老灵感）小标题仍然用创建时间，置顶的标一下。
+    final String stamp = DateFormat('yyyy-MM-dd HH:mm').format(
+      DateTime.fromMillisecondsSinceEpoch(200),
+    );
+    expect(markdown, contains('### $stamp（置顶）'));
+    expect(markdown, contains('后写的'));
+    // 有标题就拿标题当小标题，时间挪到下面一行小字里，正文不再重复一遍。
+    expect(markdown, contains('### 图论复习顺序'));
+    final String titledStamp = DateFormat('yyyy-MM-dd HH:mm').format(
+      DateTime.fromMillisecondsSinceEpoch(300),
+    );
+    expect(markdown, contains('> $titledStamp'));
+    // 灵感不绑科目，所以一个 ## 分节都不该有。
+    expect(markdown, isNot(contains('\n## ')));
+  });
+
+  test('记忆卡片 Markdown：按科目分节，题目做小标题，答案是正文', () async {
+    final subjects = await repo.listSubjects();
+    final Subject yunchou = subjects.firstWhere((s) => s.name == '运筹');
+    await repo.insertCard(
+      StudyCard(
+        type: CardType.memory,
+        subjectId: yunchou.id,
+        title: '单纯形法的判别准则是什么？',
+        content: '检验数 σj ≤ 0 时达到最优解。',
+        forgotCount: 2,
+        createdAt: 50,
+        updatedAt: 50,
+      ),
+    );
+
+    final String markdown = exportService.buildNotebookMarkdown(
+      heading: '记忆卡片',
+      cards: await cardsOfType(CardType.memory),
+      subjects: subjects,
+      now: DateTime(2026, 9, 23, 10),
+    );
+
+    expect(markdown, startsWith('# 记忆卡片'));
+    expect(markdown, contains('共 1 条'));
+    expect(markdown, contains('## 运筹'));
+    expect(markdown, contains('### 单纯形法的判别准则是什么？'));
+    expect(markdown, contains('检验数 σj ≤ 0 时达到最优解。'));
+  });
+
+  test('错题本 Markdown：同一个方法，标题和正文换成错题的说法', () async {
+    final subjects = await repo.listSubjects();
+    final Subject yunchou = subjects.firstWhere((s) => s.name == '运筹');
+    await repo.insertCard(
+      StudyCard(
+        type: CardType.mistake,
+        subjectId: yunchou.id,
+        title: '对偶单纯形法那题',
+        content: '符号搞反了，应该先看检验数',
+        forgotCount: 1,
+        createdAt: 60,
+        updatedAt: 60,
+      ),
+    );
+
+    final String markdown = exportService.buildNotebookMarkdown(
+      heading: '错题本',
+      cards: await cardsOfType(CardType.mistake),
+      subjects: subjects,
+      now: DateTime(2026, 9, 23, 10),
+    );
+
+    expect(markdown, startsWith('# 错题本'));
+    expect(markdown, contains('共 1 条'));
+    expect(markdown, contains('## 运筹'));
+    expect(markdown, contains('### 对偶单纯形法那题'));
+    expect(markdown, contains('符号搞反了，应该先看检验数'));
+  });
+
+  test('问题收集箱 Markdown：还没答案的标成待解决', () async {
+    final subjects = await repo.listSubjects();
+    final Subject yunchou = subjects.firstWhere((s) => s.name == '运筹');
+    await repo.insertCard(
+      StudyCard(
+        type: CardType.question,
+        subjectId: yunchou.id,
+        title: '为什么要有人工变量',
+        createdAt: 70,
+        updatedAt: 70,
+      ),
+    );
+    await repo.insertCard(
+      StudyCard(
+        type: CardType.question,
+        title: '单纯形法和两阶段法的关系',
+        content: '两阶段法先造人工变量凑初始基',
+        createdAt: 71,
+        updatedAt: 71,
+      ),
+    );
+
+    final String markdown = exportService.buildQuestionMarkdown(
+      cards: await cardsOfType(CardType.question),
+      subjects: subjects,
+      now: DateTime(2026, 9, 23, 10),
+    );
+
+    expect(markdown, startsWith('# 问题收集箱'));
+    expect(markdown, contains('共 2 条'));
+    expect(markdown, contains('## 运筹'));
+    expect(markdown, contains('### 为什么要有人工变量（待解决）'));
+    expect(markdown, contains('### 单纯形法和两阶段法的关系'));
+    expect(markdown, contains('两阶段法先造人工变量凑初始基'));
   });
 }

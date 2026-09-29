@@ -13,6 +13,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.surface,
     required this.divider,
     required this.iconBlock,
+    required this.decor,
     required this.primary,
     required this.onPrimary,
     required this.text,
@@ -31,6 +32,13 @@ class AppPalette extends ThemeExtension<AppPalette> {
 
   /// 功能入口、缩略图占位块的底色。
   final Color iconBlock;
+
+  /// 列表页背景上那三个装饰图案的线条色。
+  ///
+  /// 素材本身是纯白 + alpha，颜色完全由这里决定（见
+  /// [AppBackground]）。色值里已经带了很低的透明度——它就是要「淡」，
+  /// 浓了会跟列表内容抢注意力。要调深浅只改这里的 alpha。
+  final Color decor;
 
   /// 主色，只用于选中态、FAB、关键按钮、置顶标记。
   final Color primary;
@@ -52,6 +60,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     surface: Color(0xFFFFFFFF),
     divider: Color(0xFFF0E8DA),
     iconBlock: Color(0xFFF5EDDD),
+    decor: Color(0x38B5834A),
     primary: Color(0xFFB5834A),
     onPrimary: Color(0xFFFFFFFF),
     text: Color(0xFF3A3226),
@@ -64,6 +73,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     surface: Color(0xFF16253B),
     divider: Color(0xFF1E2E45),
     iconBlock: Color(0xFF1B2C44),
+    decor: Color(0x296E9BD1),
     primary: Color(0xFF6E9BD1),
     onPrimary: Color(0xFF0F1B2D),
     text: Color(0xFFE6EDF6),
@@ -77,6 +87,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? surface,
     Color? divider,
     Color? iconBlock,
+    Color? decor,
     Color? primary,
     Color? onPrimary,
     Color? text,
@@ -88,6 +99,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       surface: surface ?? this.surface,
       divider: divider ?? this.divider,
       iconBlock: iconBlock ?? this.iconBlock,
+      decor: decor ?? this.decor,
       primary: primary ?? this.primary,
       onPrimary: onPrimary ?? this.onPrimary,
       text: text ?? this.text,
@@ -104,6 +116,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       surface: Color.lerp(surface, other.surface, t)!,
       divider: Color.lerp(divider, other.divider, t)!,
       iconBlock: Color.lerp(iconBlock, other.iconBlock, t)!,
+      decor: Color.lerp(decor, other.decor, t)!,
       primary: Color.lerp(primary, other.primary, t)!,
       onPrimary: Color.lerp(onPrimary, other.onPrimary, t)!,
       text: Color.lerp(text, other.text, t)!,
@@ -135,7 +148,11 @@ abstract final class AppSize {
   static const double pagePadding = AppSpace.lg;
   static const double rowHeight = 64;
   static const double subjectRowHeight = 56;
+
+  /// 首页功能入口行的高度：96 = 上下各 16 内边距 + 64 的配图。
+  static const double hubRowHeight = 96;
   static const double thumb = 48;
+  static const double hubThumb = 64;
   static const double iconBlock = 44;
   static const double searchHeight = 44;
   static const double fab = 56;
@@ -184,7 +201,10 @@ extension AppPaletteX on BuildContext {
   AppPalette get palette => Theme.of(this).extension<AppPalette>()!;
 }
 
-ThemeData buildAppTheme(Brightness brightness) {
+/// [fontFamily] 平时留空，用系统默认中文字体。
+/// golden 测试会传一个在测试环境里手动加载的字体——Flutter 测试环境
+/// 不带中文字体，不指定的话所有汉字会渲染成方块。
+ThemeData buildAppTheme(Brightness brightness, {String? fontFamily}) {
   final AppPalette p =
       brightness == Brightness.dark ? AppPalette.dark : AppPalette.light;
 
@@ -201,6 +221,7 @@ ThemeData buildAppTheme(Brightness brightness) {
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
+    fontFamily: fontFamily,
     colorScheme: scheme,
     scaffoldBackgroundColor: p.bg,
     extensions: <ThemeExtension<dynamic>>[p],
@@ -215,7 +236,12 @@ ThemeData buildAppTheme(Brightness brightness) {
       scrolledUnderElevation: 0,
       centerTitle: false,
       titleSpacing: AppSpace.lg,
-      titleTextStyle: AppText.pageTitle.copyWith(color: p.text),
+      // 这里必须显式带上 fontFamily：AppBar 的标题样式不走默认文字样式，
+      // 漏了它的话，指定了字体族时偏偏只有标题不跟着变。
+      titleTextStyle: AppText.pageTitle.copyWith(
+        color: p.text,
+        fontFamily: fontFamily,
+      ),
       iconTheme: IconThemeData(color: p.text, size: 24),
     ),
     dividerTheme: DividerThemeData(
